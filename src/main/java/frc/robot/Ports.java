@@ -1,23 +1,29 @@
 package frc.robot;
 
-import com.ctre.phoenix6.CANBus;
-
 public final class Ports {
-    // CAN Buses
-    public static final CANBus kRoboRioCANBus = new CANBus("rio");
-    public static final CANBus kCANivoreCANBus = new CANBus("main");
+    // CAN Bus Identifiers
+    public static final String kCANivoreBus = "canivore";
+    public static final String kRoboRioCANBus = "rio";
 
-    // Talon FX IDs
-    public static final int kIntakePivot = 10;
-    public static final int kIntakeRollers = 11;
-    public static final int kFloor = 12;
-    public static final int kFeeder = 13;
-    public static final int kShooterLeft = 14;
-    public static final int kShooterMiddle = 15;
-    public static final int kShooterRight = 16;
-    public static final int kHanger = 18;
+    // Power & Sensors
+    public static final int kPigeon = 1;
 
-    // PWM Ports
-    public static final int kHoodLeftServo = 3;
-    public static final int kHoodRightServo = 4;
+    // Intake Subsystem
+    public static final int kIntakePivot = 9;
+    public static final int kIntakeRollers = 10;
+
+    // Indexer / Transport (Floor & Feeder)
+    public static final int kFloor = 11;
+    public static final int kFeeder = 12;
+
+    // Shooter Subsystem (Krakens / Falcon 500s)
+    public static final int kShooterLeft = 13;
+    public static final int kShooterMiddle = 14;
+    public static final int kShooterRight = 15;
+
+    // Hood & Hanger
+    public static final int kHood = 16;
+    public static final int kHoodLeftServo = 0;  // PWM Channel 0
+    public static final int kHoodRightServo = 1; // PWM Channel 1
+    public static final int kHanger = 17;
 }

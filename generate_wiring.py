@@ -1,80 +1,99 @@
 import os
 import re
 
-# Regex patterns to catch FRC hardware initializations & CAN IDs
-PATTERNS = {
-    'TalonFX / Falcon 500': r'(?:TalonFX|WPI_TalonFX)\s*\(\s*([^,\)]+)',
-    'TalonSRX': r'(?:TalonSRX|WPI_TalonSRX)\s*\(\s*([^,\)]+)',
-    'CANSparkMax': r'CANSparkMax\s*\(\s*([^,\)]+)',
-    'CANSparkFlex': r'CANSparkFlex\s*\(\s*([^,\)]+)',
-    'VictorSPX': r'(?:VictorSPX|WPI_VictorSPX)\s*\(\s*([^,\)]+)',
-    'CANcoder': r'(?:CANcoder|WPI_CANcoder)\s*\(\s*([^,\)]+)',
-    'Pigeon2 / IMU': r'Pigeon2\s*\(\s*([^,\)]+)',
-    'Solenoid': r'Solenoid\s*\([^,\)]*,\s*([^,\)]+)',
-    'Digital Input': r'DigitalInput\s*\(\s*([^,\)]+)',
-    'Analog Input': r'AnalogInput\s*\(\s*([^,\)]+)',
-}
+def resolve_ports(ports_file_path):
+    """Parses Ports.java to map variable names to physical CAN/PWM/DIO IDs."""
+    port_map = {}
+    if not os.path.exists(ports_file_path):
+        return port_map
+        
+    with open(ports_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+        content = f.read()
+        
+    # Match integer constants like: public static final int TOP_MOTOR_ID = 12;
+    # or inside interfaces/classes: int LEFT_INTAKE = 5;
+    matches = re.findall(r'(?:public\s+static\s+final\s+int|int)\s+([A-Za-z0-9_]+)\s*=\s*(\d+);', content)
+    for name, value in matches:
+        port_map[name] = value
+    return port_map
 
-def scan_frc_code(project_dir):
-    hardware_list = []
+def scan_repository():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    java_dir = os.path.join(script_dir, "src", "main", "java", "frc")
     
-    for root, _, files in os.walk(project_dir):
+    if not os.path.exists(java_dir):
+        print(f"ERROR: Could not locate directory: {java_dir}")
+        return
+
+    ports_file = os.path.join(java_dir, "robot", "Ports.java")
+    port_map = resolve_ports(ports_file)
+
+    # Specific WPILib & CTRE device pattern definitions
+    patterns = [
+        ('TalonFX', r'(?:TalonFX|WPI_TalonFX)\s*\(\s*([^,\)]+)'),
+        ('TalonSRX', r'(?:TalonSRX|WPI_TalonSRX)\s*\(\s*([^,\)]+)'),
+        ('CANSparkMax', r'CANSparkMax\s*\(\s*([^,\)]+)'),
+        ('CANSparkFlex', r'CANSparkFlex\s*\(\s*([^,\)]+)'),
+        ('CANcoder', r'(?:CANcoder|WPI_CANcoder)\s*\(\s*([^,\)]+)'),
+        ('Pigeon2', r'Pigeon2\s*\(\s*([^,\)]+)'),
+        ('DigitalInput', r'DigitalInput\s*\(\s*([^,\)]+)'),
+        ('Solenoid', r'Solenoid\s*\([^,\)]*,\s*([^,\)]+)')
+    ]
+
+    hardware_found = []
+
+    for root, _, files in os.walk(java_dir):
         for file in files:
-            if file.endswith(('.java', '.cpp', '.h')):
+            if file.endswith('.java'):
                 filepath = os.path.join(root, file)
                 with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read()
-                    
-                    for dev_type, pattern in PATTERNS.items():
-                        matches = re.finditer(pattern, content)
-                        for m in matches:
-                            raw_id = m.group(1).strip()
-                            hardware_list.append({
-                                'type': dev_type,
-                                'id': raw_id,
-                                'source_file': file
-                            })
-    return hardware_list
+                    text = f.read()
 
-def generate_mermaid_diagram(hardware):
-    lines = ["graph TD", "    rio[roboRIO Main Controller]"]
-    seen = set()
+                for dev_type, regex in patterns:
+                    for match in re.finditer(regex, text):
+                        raw_arg = match.group(1).strip()
+                        # Clean constant namespaces like Ports.Shooter.TOP_MOTOR -> TOP_MOTOR
+                        clean_var = raw_arg.split('.')[-1]
+                        resolved_id = port_map.get(clean_var, raw_arg)
+                        
+                        hardware_found.append({
+                            'device': dev_type,
+                            'id': resolved_id,
+                            'file': file
+                        })
+
+    # Generate Mermaid Diagram File
+    lines = [
+        "# Robot Hardware Wiring Diagram",
+        "",
+        "```mermaid",
+        "graph TD",
+        "    rio[roboRIO Main Controller]"
+    ]
     
-    for hw in hardware:
-        # Clean ID string for node identifier
-        clean_id_name = re.sub(r'[^a-zA-Z0-9_]', '_', hw['id'])
-        node_id = f"dev_{hw['type'].replace(' ', '_').replace('/', '_')}_{clean_id_name}"
-        label = f"{hw['type']}<br/>ID: {hw['id']}<br/>({hw['source_file']})"
+    seen_nodes = set()
+    for item in hardware_found:
+        node_id = f"dev_{item['device']}_{re.sub(r'[^a-zA-Z0-9_]', '_', item['id'])}"
+        label = f"{item['device']}<br/>ID/Port: {item['id']}<br/>({item['file']})"
         
-        if node_id not in seen:
-            seen.add(node_id)
+        if node_id not in seen_nodes:
+            seen_nodes.add(node_id)
             lines.append(f'    {node_id}["{label}"]')
-            
-            if any(k in hw['type'] for k in ["Digital", "Analog", "Solenoid"]):
-                lines.append(f"    rio -->|DIO/PWM/Pneumatics| {node_id}")
+            if item['device'] in ['DigitalInput', 'Solenoid']:
+                lines.append(f"    rio -->|DIO/PCM| {node_id}")
             else:
                 lines.append(f"    rio -->|CAN Bus| {node_id}")
-                
-    return "\n".join(lines)
+
+    lines.append("```\n")
+    
+    output_path = os.path.join(script_dir, "WIRING_DIAGRAM.md")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+        
+    print("=" * 60)
+    print(f"SUCCESS: Mapped {len(seen_nodes)} hardware components.")
+    print(f"Output generated at: {output_path}")
+    print("=" * 60)
 
 if __name__ == '__main__':
-    # Build absolute path to src directory based on script location
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_path = os.path.join(script_dir, 'src', 'main', 'java')
-    
-    print(f"Scanning directory: {project_path}")
-    
-    if os.path.exists(project_path):
-        detected_hardware = scan_frc_code(project_path)
-        if detected_hardware:
-            mermaid_code = generate_mermaid_diagram(detected_hardware)
-            out_path = os.path.join(script_dir, "WIRING_DIAGRAM.md")
-            with open(out_path, "w", encoding='utf-8') as f:
-                f.write("# FRC Hardware & Wiring Map\n\n```mermaid\n")
-                f.write(mermaid_code)
-                f.write("\n```\n")
-            print(f"SUCCESS: Found {len(detected_hardware)} device declaration(s). Written to WIRING_DIAGRAM.md!")
-        else:
-            print("Scan complete, but no motor/sensor instantiations were detected in your Java files yet.")
-    else:
-        print(f"ERROR: Directory path does not exist: {project_path}")
+    scan_repository()
