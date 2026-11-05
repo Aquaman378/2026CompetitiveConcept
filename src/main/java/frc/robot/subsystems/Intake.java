@@ -1,5 +1,6 @@
 package frc.robot.subsystems;
 
+import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.controls.DutyCycleOut;
 import com.ctre.phoenix6.hardware.TalonFX;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -13,8 +14,8 @@ public class Intake extends SubsystemBase {
         STOW
     }
 
-    private final TalonFX pivotMotor = new TalonFX(Ports.kIntakePivot, Ports.kCANivoreBus);
-    private final TalonFX rollerMotor = new TalonFX(Ports.kIntakeRollers, Ports.kCANivoreBus);
+    private final TalonFX pivotMotor = new TalonFX(Ports.kIntakePivot, new CANBus(Ports.kCANivoreBus));
+    private final TalonFX rollerMotor = new TalonFX(Ports.kIntakeRollers, new CANBus(Ports.kCANivoreBus));
     private final DutyCycleOut dutyCycle = new DutyCycleOut(0);
 
     public Intake() {}

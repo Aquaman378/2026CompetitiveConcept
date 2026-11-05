@@ -7,6 +7,7 @@ import static edu.wpi.first.units.Units.RotationsPerSecond;
 import static edu.wpi.first.units.Units.Second;
 import static edu.wpi.first.units.Units.Volts;
 
+import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.configs.CurrentLimitsConfigs;
 import com.ctre.phoenix6.configs.MotionMagicConfigs;
 import com.ctre.phoenix6.configs.MotorOutputConfigs;
@@ -62,7 +63,7 @@ public class Hanger extends SubsystemBase {
     private boolean isHomed = false;
 
     public Hanger() {
-        motor = new TalonFX(Ports.kHanger, Ports.kRoboRioCANBus);
+        motor = new TalonFX(Ports.kHanger, new CANBus(Ports.kRoboRioCANBus));
 
         final TalonFXConfiguration config = new TalonFXConfiguration()
             .withMotorOutput(

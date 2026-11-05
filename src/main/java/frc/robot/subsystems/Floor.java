@@ -3,7 +3,7 @@ package frc.robot.subsystems;
 import static edu.wpi.first.units.Units.Amps;
 import static edu.wpi.first.units.Units.RPM;
 import static edu.wpi.first.units.Units.Volts;
-
+import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.configs.CurrentLimitsConfigs;
 import com.ctre.phoenix6.configs.MotorOutputConfigs;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
@@ -11,6 +11,7 @@ import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
+import com.ctre.phoenix6.CANBus;
 
 import edu.wpi.first.units.measure.Voltage;
 import edu.wpi.first.util.sendable.SendableBuilder;
@@ -39,7 +40,7 @@ public class Floor extends SubsystemBase {
     private final VoltageOut voltageRequest = new VoltageOut(0);
 
     public Floor() {
-        motor = new TalonFX(Ports.kFloor, Ports.kRoboRioCANBus);
+        motor = new TalonFX(Ports.kFloor, new CANBus(Ports.kRoboRioCANBus));
 
         final TalonFXConfiguration config = new TalonFXConfiguration()
             .withMotorOutput(
@@ -72,6 +73,9 @@ public class Floor extends SubsystemBase {
 
     @Override
     public void initSendable(SendableBuilder builder) {
+        builder.addDoubleProperty("RPM", () -> motor.getVelocity().getValueAsDouble() * 60.0, null);
+        builder.addDoubleProperty("Stator Current", () -> motor.getStatorCurrent().getValueAsDouble(), null);
+        builder.addDoubleProperty("Supply Current", () -> motor.getSupplyCurrent().getValueAsDouble(), null);
         builder.addStringProperty("Command", () -> getCurrentCommand() != null ? getCurrentCommand().getName() : "null", null);
         builder.addDoubleProperty("RPM", () -> motor.getVelocity().getValue().in(RPM), null);
         builder.addDoubleProperty("Stator Current", () -> motor.getStatorCurrent().getValue().in(Amps), null);
